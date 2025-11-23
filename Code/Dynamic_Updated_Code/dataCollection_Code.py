@@ -1,9 +1,11 @@
 # fixed_100_frame_collector.py
 # Collects fixed-length (100 frame) sign videos with clear phases:
 # NEUTRAL -> SIGN NOW -> NEUTRAL AGAIN
+# Updated: Safe indexing to avoid overwriting when some files are deleted
 
 import cv2
 import os
+import re
 
 # ------------------- CONFIG -------------------
 DATA_PATH = '/Users/nahidkhan/Local Drive/Research/Dynamic Dataset'
@@ -23,6 +25,26 @@ NEUTRAL_END_FRAMES   = 20   # শেষের ২০ ফ্রেম neutral/hol
 assert NEUTRAL_START_FRAMES + SIGN_FRAMES + NEUTRAL_END_FRAMES == FRAMES_PER_VIDEO, \
     "Phase frame counts must sum to FRAMES_PER_VIDEO"
 # ------------------------------------------------
+
+
+def get_next_index(files, sign_name):
+    """
+    Find the max index from existing files like:
+    sign_name_001.mp4, sign_name_002.mp4, ...
+    Return max_index + 1 so we never overwrite.
+    """
+    pattern = re.compile(
+        rf"^{re.escape(sign_name)}_(\d+)\.(mp4|avi|mov)$",
+        re.IGNORECASE
+    )
+    max_idx = 0
+    for f in files:
+        m = pattern.match(f)
+        if m:
+            idx = int(m.group(1))
+            if idx > max_idx:
+                max_idx = idx
+    return max_idx + 1
 
 
 def main():
@@ -87,12 +109,13 @@ def main():
         elif key == ord('s'):
             break
 
-    # ---- Determine starting file index so old files not overwritten ----
+    # ---- SAFE starting index (no overwrite even if files deleted) ----
     existing_files = [
         f for f in os.listdir(sign_path)
         if f.lower().endswith((".mp4", ".avi", ".mov"))
     ]
-    start_num = len(existing_files) + 1
+
+    start_num = get_next_index(existing_files, sign_name)
     end_num = start_num + total_videos_to_collect - 1
 
     stop_all = False
